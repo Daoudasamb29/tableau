@@ -1,0 +1,6 @@
+{
+  "name": "DEM Transport",
+  "description": "Portail d'administration et tableau de bord de surveillance pour DEM Transport : gestion des chauffeurs, commissions et suivi des paiements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

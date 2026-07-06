@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #275300;
+  --color-primary-hover: #1f4200;
+  --color-primary-container: #3b6d11;
+  --color-on-primary-container: #b2ed83;
+  
+  --color-status-success-bg: #DCF1E1;
+  --color-status-success-text: #166534;
+  --color-status-warning-bg: #FEF3C7;
+  --color-status-warning-text: #92400E;
+  --color-status-danger-bg: #FEE2E2;
+  --color-status-danger-text: #991B1B;
+  
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container: #edeeef;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-container-highest: #e1e3e4;
+  
+  --color-border-subtle: #e5e7eb;
+}
+
+body {
+  font-family: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  background-color: #f8f9fa;
+  color: #191c1d;
+}
+
+/* Custom scrollbars for lists */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c2c9b7;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #727969;
+}
+
