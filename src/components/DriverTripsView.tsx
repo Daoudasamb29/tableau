@@ -71,6 +71,24 @@ export default function DriverTripsView({
     return matchesSearch && matchesStatus;
   });
 
+  // Classer selon la date et l'heure en priorité (plus récent en haut).
+  // Si disponible, on utilise aussi le timestamp createdAt de Supabase / local.
+  const sortedFilteredTrips = [...filteredTrips].sort((a, b) => {
+    // 1. Sort by date descending
+    const dateComp = (b.date || '').localeCompare(a.date || '');
+    if (dateComp !== 0) return dateComp;
+    
+    // 2. Sort by time descending
+    const timeComp = (b.time || '').localeCompare(a.time || '');
+    if (timeComp !== 0) return timeComp;
+
+    // 3. Fallback to createdAt timestamp descending if available
+    if (a.createdAt && b.createdAt) {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+    return 0;
+  });
+
   // Stats Calculations
   const totalTrips = trips.length;
   const activeTripsCount = trips.filter(t => t.status === 'En cours' || t.status === 'running').length;
@@ -151,7 +169,8 @@ export default function DriverTripsView({
       driverAvatar: driver?.avatar || undefined,
       vehicleName: driver?.vehicle || undefined,
       vehiclePlate: driver?.plate || undefined,
-      price
+      price,
+      createdAt: new Date().toISOString()
     };
 
     onAddTrip(newTrip);
@@ -293,7 +312,7 @@ export default function DriverTripsView({
       </div>
 
       {/* Trips Grid list */}
-      {filteredTrips.length === 0 ? (
+      {sortedFilteredTrips.length === 0 ? (
         <div className="bg-white border border-border-subtle rounded-xl p-10 text-center space-y-2">
           <Compass className="h-12 w-12 text-on-surface-variant/40 mx-auto" />
           <h3 className="font-bold text-sm text-on-surface">Aucun trajet trouvé</h3>
@@ -303,7 +322,7 @@ export default function DriverTripsView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredTrips.map(trip => {
+          {sortedFilteredTrips.map(trip => {
             const tripDbStatus = trip.status === 'Terminé' || trip.status === 'completed' ? 'completed' :
                                  trip.status === 'En cours' || trip.status === 'running' ? 'running' : 'pending';
 
