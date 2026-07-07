@@ -34,9 +34,10 @@ import {
   syncTrip, 
   syncSettings,
   mapDriverFromDb,
-  mapPaymentFromDb
+  mapPaymentFromDb,
+  mapTripFromDb
 } from './supabaseSync';
-import { playLoudReservationSound } from './utils/audio';
+import { playLoudReservationSound, initAudioOnFirstInteraction } from './utils/audio';
 import { initAuth, googleSignIn, googleSignOut, sendGmailEmail } from './gmail';
 import { 
   TrafficCone, 
@@ -184,6 +185,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Initialize audio context unlocking on first user interaction
+  useEffect(() => {
+    initAudioOnFirstInteraction();
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
@@ -292,6 +298,26 @@ export default function App() {
                     setPayments(prev => prev.map(p => p.id === mapped.id ? { ...p, ...mapped } : p));
                   } else if (payload.eventType === 'DELETE') {
                     setPayments(prev => prev.filter(p => p.id !== payload.old.id));
+                  }
+                }
+              )
+              .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'driver_trips' },
+                (payload) => {
+                  console.log('Changement Trajet en direct (Supabase) :', payload);
+                  if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    const mapped = mapTripFromDb(payload.new);
+                    setTrips(prev => {
+                      const index = prev.findIndex(t => t.id === mapped.id);
+                      if (index !== -1) {
+                        return prev.map(t => t.id === mapped.id ? { ...t, ...mapped } : t);
+                      } else {
+                        return [mapped, ...prev];
+                      }
+                    });
+                  } else if (payload.eventType === 'DELETE') {
+                    setTrips(prev => prev.filter(t => t.id !== payload.old.id));
                   }
                 }
               )

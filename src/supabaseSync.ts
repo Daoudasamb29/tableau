@@ -253,19 +253,24 @@ async function checkTableExists(tableName: string): Promise<boolean> {
   }
 }
 
+let tablesVerifiedSuccessfully = false;
+
 // Fetch all data from Supabase using user's 3 tables
 export async function loadAllData(): Promise<SupabaseData | null> {
   if (!supabase || !isSupabaseConfigured) return null;
 
   try {
-    // Check if the 3 actual tables exist
-    const requiredTables = ['drivers', 'driver_trips', 'bookings'];
-    for (const table of requiredTables) {
-      const exists = await checkTableExists(table);
-      if (!exists) {
-        console.warn(`La table '${table}' n'existe pas ou n'est pas accessible.`);
+    // Optimisation majeure : On ne vérifie l'existence des tables qu'une seule fois au démarrage, en parallèle.
+    // Cela évite de faire 3 requêtes HTTP séquentielles de vérification à chaque appel de loadAllData.
+    if (!tablesVerifiedSuccessfully) {
+      const requiredTables = ['drivers', 'driver_trips', 'bookings'];
+      const checks = await Promise.all(requiredTables.map(checkTableExists));
+      
+      if (checks.includes(false)) {
+        console.warn("Certaines tables requises n'existent pas ou ne sont pas accessibles.");
         return null;
       }
+      tablesVerifiedSuccessfully = true;
     }
 
     const [
@@ -282,13 +287,39 @@ export async function loadAllData(): Promise<SupabaseData | null> {
     if (tripsRes.error) throw tripsRes.error;
     if (bookingsRes.error) throw bookingsRes.error;
 
-    // Convert to application model
-    const drivers = (driversRes.data || []).map(mapDriverFromDb);
-    const trips = (tripsRes.data || []).map(mapTripFromDb);
-    const payments = (bookingsRes.data || []).map(mapPaymentFromDb);
+    // Convert to application model and strictly deduplicate to avoid key collision warnings in React
+    const rawDrivers = (driversRes.data || []).map(mapDriverFromDb);
+    const drivers: Driver[] = [];
+    const seenDrivers = new Set<string>();
+    for (const d of rawDrivers) {
+      if (d && d.id && !seenDrivers.has(d.id)) {
+        seenDrivers.add(d.id);
+        drivers.push(d);
+      }
+    }
+
+    const rawTrips = (tripsRes.data || []).map(mapTripFromDb);
+    const trips: Trip[] = [];
+    const seenTrips = new Set<string>();
+    for (const t of rawTrips) {
+      if (t && t.id && !seenTrips.has(t.id)) {
+        seenTrips.add(t.id);
+        trips.push(t);
+      }
+    }
+
+    const rawPayments = (bookingsRes.data || []).map(mapPaymentFromDb);
+    const payments: ClientPayment[] = [];
+    const seenPayments = new Set<string>();
+    for (const p of rawPayments) {
+      if (p && p.id && !seenPayments.has(p.id)) {
+        seenPayments.add(p.id);
+        payments.push(p);
+      }
+    }
 
     // Derived Commissions from bookings data
-    const commissions: Commission[] = payments.map((p, index) => {
+    const rawCommissions: Commission[] = payments.map((p, index) => {
       // Find driver related to this route or give a mock driver link
       const driver = drivers[index % drivers.length] || drivers[0];
       const amount = Math.round(p.amount * 0.1); // 10% commission rate
@@ -302,11 +333,19 @@ export async function loadAllData(): Promise<SupabaseData | null> {
         week: 'Semaine en cours'
       };
     });
+    const commissions: Commission[] = [];
+    const seenCommissions = new Set<string>();
+    for (const c of rawCommissions) {
+      if (c && c.id && !seenCommissions.has(c.id)) {
+        seenCommissions.add(c.id);
+        commissions.push(c);
+      }
+    }
 
     // Generate fresh activities based on the loaded database state
-    const activities: Activity[] = [];
+    const rawActivities: Activity[] = [];
     payments.forEach(p => {
-      activities.push({
+      rawActivities.push({
         id: `act-p-${p.id}`,
         type: 'reservation',
         title: 'Réservation Enregistrée',
@@ -317,7 +356,7 @@ export async function loadAllData(): Promise<SupabaseData | null> {
       });
     });
     trips.forEach(t => {
-      activities.push({
+      rawActivities.push({
         id: `act-t-${t.id}`,
         type: 'trip_published',
         title: 'Trajet Publié',
@@ -327,7 +366,7 @@ export async function loadAllData(): Promise<SupabaseData | null> {
       });
     });
     drivers.forEach(d => {
-      activities.push({
+      rawActivities.push({
         id: `act-d-${d.id}`,
         type: 'confirmed',
         title: 'Chauffeur Activé',
@@ -336,6 +375,15 @@ export async function loadAllData(): Promise<SupabaseData | null> {
         status: 'normal'
       });
     });
+
+    const activities: Activity[] = [];
+    const seenActivities = new Set<string>();
+    for (const a of rawActivities) {
+      if (a && a.id && !seenActivities.has(a.id)) {
+        seenActivities.add(a.id);
+        activities.push(a);
+      }
+    }
 
     // Fallback settings stored in localStorage
     let settings: PortalSettings = {
